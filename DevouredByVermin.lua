@@ -2,16 +2,22 @@ local Addon = CreateFrame("FRAME", "BloodwormTracker");
 
 local wormsTable = {};
 local wormsTableSize = 0;
-local bloodwormsHP = UnitHealthMax("player")*0.35;
 
 local frameAnchor = nil;
 
 
 local function getAmountHeal(stack)
-	local heal = (stack * 0.10 * bloodwormsHP)/1000;
+	local heal = (stack * 0.10 * UnitHealthMax("player")*0.35)/1000;
 	return math.floor(heal * 10 + 0.5) / 10;
 end
 
+local function reorderIcons()
+	local i = 0;
+	for guid, table in pairs(wormsTable) do
+		table["frame"]:SetPoint("LEFT", frameAnchor, i*32, 0);
+		i = i + 1;
+	end
+end
 
 local function createFrameIcon(index)
 	local frame = CreateFrame("FRAME", nil, UIParent);
@@ -32,6 +38,22 @@ local function createFrameIcon(index)
 	frame.heal:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE");
 	frame.heal:SetTextColor(0, 1, 0.2, 1);
 	frame.heal:SetPoint("CENTER", 0, 0);
+
+	local total = 0;
+	frame:SetScript("OnUpdate", function(self, elapsed)
+		total = total + elapsed;
+		if(total > 20) then
+			frame:SetScript("OnUpdate", nil);
+			frame:Hide();
+			for guid, table in pairs(wormsTable) do
+				if(self == table["frame"]) then
+					wormsTable[guid] = nil;
+					wormsTableSize = wormsTableSize - 1;
+					reorderIcons();
+				end
+			end
+		end
+	end)
 
 	frame:Show();
 
@@ -69,13 +91,7 @@ local function initFrameAnchor()
 end
 
 
-local function reorderIcons()
-	local i = 0;
-	for guid, table in pairs(wormsTable) do
-		table["frame"]:SetPoint("LEFT", frameAnchor, i*32, 0);
-		i = i + 1;
-	end
-end
+
 
 
 SLASH_DevouredByVermin1, SLASH_DevouredByVermin2 = "/devouredbyvermin", "/dbv";
@@ -113,12 +129,12 @@ Addon:SetScript("OnEvent", function(self, event, ...)
 				local frame = createFrameIcon(wormsTableSize);
 				wormsTable[destGUID] = { stack = 0, frame = frame };
 				wormsTableSize = wormsTableSize + 1;
-			elseif(type == "SPELL_AURA_APPLIED_DOSE" and sourceName == "Bloodworm" and spellID == 81277) then
+			elseif(wormsTable[destGUID] and type == "SPELL_AURA_APPLIED_DOSE" and sourceName == "Bloodworm" and spellID == 81277) then
 				destGUID = tostring(destGUID);
 				wormsTable[destGUID]["stack"] = numStack;
 				wormsTable[destGUID]["frame"].stack:SetText(numStack);
 				wormsTable[destGUID]["frame"].heal:SetText(getAmountHeal(numStack) .. "k");
-			elseif(type == "SPELL_AURA_REMOVED" and sourceName == "Bloodworm" and spellID == 81277) then
+			elseif(wormsTable[destGUID] and type == "SPELL_INSTAKILL" and sourceName == "Bloodworm" and spellID == 81280) then
 				destGUID = tostring(destGUID);
 				wormsTable[destGUID]["frame"]:Hide();
 				wormsTable[destGUID] = nil;
